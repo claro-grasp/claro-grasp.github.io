@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CLARO: a training-free VLM agent that plans, declutters, and grasps open-vocabulary objects in cluttered scenes. WACV 2027.">
+  <meta name="keywords" content="CLARO, VLM agent, open-vocabulary grasping, clutter, robot manipulation, WACV">
+  <meta property="og:title" content="CLARO: Clutter Aware Robot Orchestrator for Open-Vocabulary Grasping using VLM Agents">
+  <meta property="og:description" content="Training-free VLM agent for open-vocabulary grasping in clutter. WACV 2027.">
+  <meta property="og:image" content="static/images/fig2_pipeline.jpg">
+  <meta name="author" content="Sungsu Kim, Vineet Bhat, Prashanth Krishnamurthy, Ramesh Karri, Farshad Khorrami">
+  <title>CLARO: Clutter Aware Robot Orchestrator</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/logs/episodes.js"></script>
+
+
+</head>
+<body>
+
+<script>
+/* ===================================================================
+   Real-robot scenes. code: L = low clutter, H = high clutter.
+   log: folder name in the robot logs. trial: the logged trial shown
+   in the step-by-step viewer (trial numbers start at 1).
+   =================================================================== */
+var SCENES = [
+  { code: "L1", log: "scene00", name: "BBQ sauce bottle", desc: "The target is fully visible.", trial: 1 },
+  { code: "L2", log: "scene01", name: "mayonnaise bottle", desc: "The target is partly behind a first-aid kit.", trial: 1 },
+  { code: "L3", log: "scene04", name: "alphabet soup can", desc: "A bottle leans on the target.", trial: 2 },
+  { code: "L4", log: "scene05", name: "sugar box", desc: "Two objects lie on top of the target.", trial: 2 },
+  { code: "L5", log: "scene06", name: "tomato sauce can", desc: "The target is behind two cans.", trial: 5 },
+  { code: "L6", log: "scene13", name: "Coca-Cola can", desc: "The objects are all red and partly stacked.", trial: 3 },
+  { code: "L7", log: "scene17", name: "butter box", desc: "The target is partly behind a cheese can.", trial: 2 },
+  { code: "L8", log: "scene18", name: "green beans can", desc: "The target is behind a large water bottle.", trial: 1 },
+  { code: "H1", log: "scene07", name: "blue ointment", desc: "The target is visible.", trial: 1 },
+  { code: "H2", log: "scene08", name: "sliced peaches can", desc: "The target is not visible at the start.", trial: 4 },
+  { code: "H3", log: "scene09", name: "tennis ball", desc: "The target is not visible at the start.", trial: 1 },
+  { code: "H4", log: "scene11", name: "tomato sauce can", desc: "The target is not visible at the start.", trial: 4 },
+  { code: "H5", log: "scene12", name: "pitted cherries can", desc: "The target is behind a stack of two cans.", trial: 4 },
+  { code: "H6", log: "scene14", name: "BBQ sauce bottle", desc: "The target is almost fully hidden.", trial: 1 },
+  { code: "H7", log: "scene15", name: "blue ointment", desc: "The target is surrounded by other objects.", trial: 4 },
+  { code: "H8", log: "scene16", name: "alphabet soup can", desc: "The target is behind a block, a can, and two boxes.", trial: 5 }
+];
+</script>
+
+<!-- ================= HEADER ================= -->
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-2 publication-title">CLARO: Clutter Aware Robot Orchestrator for Open-Vocabulary Grasping using VLM Agents</h1>
+
+                    <div class="is-size-5 publication-authors">
+            <span class="author-block"><a href="https://sungsuk1m.github.io/" target="_blank" rel="noopener">Sungsu Kim</a><sup>1,*</sup>,</span>
+            <span class="author-block"><a href="https://scholar.google.com/citations?user=rt6UWvgAAAAJ&amp;hl=en" target="_blank" rel="noopener">Vineet Bhat</a><sup>2,*</sup>,</span>
+            <span class="author-block"><a href="https://scholar.google.com/citations?user=IKzz9l0AAAAJ&amp;hl=en" target="_blank" rel="noopener">Prashanth Krishnamurthy</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="https://scholar.google.com/citations?user=o60TaTEAAAAJ&amp;hl=en" target="_blank" rel="noopener">Ramesh Karri</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="https://scholar.google.com/citations?user=NdOqlPQAAAAJ&amp;hl=en" target="_blank" rel="noopener">Farshad Khorrami</a><sup>2</sup></span>
+          </div>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>New York University Abu Dhabi,</span>
+            <span class="author-block"><sup>2</sup>New York University Tandon School of Engineering</span>
+          </div>
+          <div class="is-size-6 publication-authors">
+            <span class="author-block"><sup>*</sup>Equal contribution</span>
+          </div>
+          <div class="is-size-5 publication-venue" style="margin: 0.5rem auto 0;"><a class="venue-link" href="https://wacv.thecvf.com/Conferences/2027/index.html" target="_blank" rel="noopener">WACV 2027</a></div>
+
+          <!-- Links are set from ARXIV_ID and CODE_URL in the script near the end of this file. -->
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <span class="link-block">
+                <a id="lnkPaper" href="#" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span><span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a id="lnkArxiv" href="#" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="ai ai-arxiv"></i></span><span>arXiv</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a id="lnkCode" href="#" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fab fa-github"></i></span><span>Code</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TEASER ================= -->
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <div class="tldr mb-5">
+        <span class="tldr-label">TL;DR</span>
+        <p><b>CLARO</b> is a training-free VLM agent that finds and grasps an object named in natural language, even when it is hidden in clutter.
+          It calls perception, grasp, and push tools in a closed loop and keeps a memory of its past actions.
+          It reaches <b>88.8%</b> success on a real Franka arm and <b>89.1%</b> in simulation.</p>
+      </div>
+      <video id="teaser" autoplay muted loop playsinline controls preload="metadata" style="width:100%" src="static/videos/teaser.mp4"></video>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ABSTRACT ================= -->
+<section class="section" id="abstract">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified abstract-text">
+          <p>
+            Robots that follow natural-language instructions unlock a wide range of autonomous applications in households, warehouses, and labs. Real-world environments are diverse and often heavily cluttered, requiring robots to plan over multiple steps, act, and replan as they work toward a goal. We present <b>CLARO (CLutter-Aware Robot Orchestrator)</b>, <b>a VLM agent that orchestrates a set of perception and manipulation skills</b>: open-vocabulary object detection, segmentation, 6-DoF grasping, and <b>non-prehensile pushing</b> to locate and retrieve a language-specified target in clutter. CLARO maintains <b>a memory of its past actions</b> to support long-horizon execution, and emits manipulation targets (grasp poses/3D waypoints) allowing <b>transfer across robot arms without task-specific training</b>.
+          </p>
+          <p>
+            We evaluate CLARO against a range of methods on a dynamic simulation environment and standard image-based benchmarks, demonstrating strong generalization across object classes, lighting, and clutter levels. CLARO attains <b>an average success rate of 89.1%</b>, <b>a relative improvement of over 16%</b> on the strongest competing method in high cluttered scenes. We further analyze performance along grounding and grasping axes to characterize where each method succeeds and fails. Finally, we deploy CLARO on a robot arm across diverse cluttered scenes, achieving <b>a success rate of 88.8%</b>, and demonstrating strong sim2real generalizability.
+          </p>
+        </div>
+        <img class="figure-img mt-4" src="static/images/claro_loop.gif" alt="CLARO closes the loop at the tool level">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= METHOD ================= -->
+<section class="section section-shaded" id="method">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <h2 class="title is-3">Method</h2>
+        <img class="figure-img figure-card" src="static/images/fig2_pipeline.jpg" alt="CLARO pipeline">
+        <div class="content has-text-justified caption">
+          <p>Given an RGB-D observation and an instruction, a VLM planner (Gemini 3.1 Pro) reads the current scene and a long-term memory of past images, tool calls, and plan/belief traces, and selects the next tool. Perception tools ground the scene. Manipulation tools act on it. After each action, the new observation is added to memory.</p>
+        </div>
+      </div>
+    </div>
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+        <div class="content has-text-justified">
+          <p class="ui-hint"><span class="try-badge">TRY IT</span><b>Click a tool</b> to see an example.</p>
+        </div>
+        <div class="columns is-mobile is-multiline tool-cards" id="toolCards">
+          <div class="column is-half-mobile is-one-quarter-tablet">
+            <div class="tool-card perception is-active" data-tool="0" tabindex="0" role="button">
+              <span class="icon is-medium"><i class="fas fa-camera fa-lg"></i></span>
+              <p class="tool-name">survey_scene</p>
+              <span class="tag is-info is-light">Perception</span>
+              <p class="tool-q">What is on the table?</p>
+            </div>
+          </div>
+          <div class="column is-half-mobile is-one-quarter-tablet">
+            <div class="tool-card perception" data-tool="1" tabindex="0" role="button">
+              <span class="icon is-medium"><i class="fas fa-crosshairs fa-lg"></i></span>
+              <p class="tool-name">locate_object</p>
+              <span class="tag is-info is-light">Perception</span>
+              <p class="tool-q">Where exactly is the object?</p>
+            </div>
+          </div>
+          <div class="column is-half-mobile is-one-quarter-tablet">
+            <div class="tool-card manipulation" data-tool="2" tabindex="0" role="button">
+              <span class="icon is-medium"><i class="fas fa-hand-rock fa-lg"></i></span>
+              <p class="tool-name">grasp</p>
+              <span class="tag is-danger is-light">Manipulation</span>
+              <p class="tool-q">Pick up and remove the object.</p>
+            </div>
+          </div>
+          <div class="column is-half-mobile is-one-quarter-tablet">
+            <div class="tool-card manipulation" data-tool="3" tabindex="0" role="button">
+              <span class="icon is-medium"><i class="fas fa-arrows-alt-h fa-lg"></i></span>
+              <p class="tool-name">push</p>
+              <span class="tag is-danger is-light">Manipulation</span>
+              <p class="tool-q">Slide the object aside.</p>
+            </div>
+          </div>
+        </div>
+        <div class="tool-detail" id="toolDetail">
+          <div class="columns">
+            <div class="column is-6"><img id="tdImg" alt="Tool example" src="" style="width:100%; border-radius:8px; display:block"></div>
+            <div class="column is-6">
+              <p id="tdDesc" class="mb-3"></p>
+              <div class="tool-call" id="tdCall"></div>
+              <div class="v-field"><div class="label-text">Tool result</div><div id="tdResult"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= REAL-ROBOT EXPERIMENTS ================= -->
+<section class="section" id="real-robot">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Real-Robot Experiments</h2>
+    <div class="content has-text-justified">
+      <p>A Franka arm and 40 objects. 16 scenes (8 low clutter, 8 high clutter), 5 trials per scene for each method.</p>
+    </div>
+    <p class="ui-hint"><span class="try-badge">TRY IT</span><b>Pick a scene</b> to watch a CLARO success.</p>
+    <div class="has-text-centered mb-3">
+      <p class="is-size-6 has-text-weight-bold mb-2">Low clutter</p>
+      <div class="buttons is-centered mb-2" id="epLow"></div>
+      <p class="is-size-6 has-text-weight-bold mb-2">High clutter</p>
+      <div class="buttons is-centered" id="epHigh"></div>
+    </div>
+    <video class="result-video" id="epVideo" controls muted autoplay loop playsinline preload="metadata"></video>
+    <p class="caption has-text-centered mb-5" id="epCaption"></p>
+    <div class="table-container">
+      <table class="table is-narrow is-hoverable is-fullwidth">
+        <thead>
+          <tr><th rowspan="2">Method</th><th colspan="2">Task SR (%) &uarr;</th><th colspan="2">Action Steps &darr;</th></tr>
+          <tr><th>Low</th><th>High</th><th>Low</th><th>High</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>OWG</td><td>67.5 &plusmn; 35.4</td><td>22.5 &plusmn; 32.8</td><td>3.4 &plusmn; 1.2</td><td><u>4.6 &plusmn; 0.9</u></td></tr>
+          <tr><td>ThinkGrasp</td><td><u>70.0 &plusmn; 33.8</u></td><td><u>50.0 &plusmn; 35.5</u></td><td><b>3.2 &plusmn; 1.3</b></td><td><b>4.3 &plusmn; 1.1</b></td></tr>
+          <tr class="ours"><td><b>CLARO (ours)</b></td><td><b>97.5 &plusmn; 7.1</b></td><td><b>80.0 &plusmn; 23.9</b></td><td><u>3.3 &plusmn; 1.1</u></td><td>5.4 &plusmn; 1.8</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">Task success rate (%) with 95% confidence intervals, and actions per episode. Bold: best. Underline: second best.</p>
+
+  </div>
+</section>
+
+<!-- ================= REASONING LOGS ================= -->
+<section class="section section-shaded" id="logs">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Step-by-Step Reasoning on the Real Robot</h2>
+    <p class="ui-hint"><span class="try-badge">TRY IT</span><b>Pick a scene</b>, then <b>step through</b> CLARO&rsquo;s decisions.</p>
+    <div class="has-text-centered mb-3">
+      <p class="is-size-6 has-text-weight-bold mb-2">Low clutter</p>
+      <div class="buttons is-centered mb-2" id="lgLow"></div>
+      <p class="is-size-6 has-text-weight-bold mb-2">High clutter</p>
+      <div class="buttons is-centered mb-3" id="lgHigh"></div>
+    </div>
+    <div class="viewer-box" id="viewerRoot">
+      <p class="mb-3 lg-task" id="lgTask"></p>
+      <div class="columns">
+        <div class="column is-7 viewer-img">
+          <div id="lgImg"></div>
+          <div id="lgExtra" class="mt-2"></div>
+        </div>
+        <div class="column is-5">
+          <div class="tool-call" id="lgCall"></div>
+          <div class="v-field" id="fReason"><div class="label-text">Planner reasoning</div><div id="lgReason"></div></div>
+          <div class="v-field" id="fPlan"><div class="label-text">Plan</div><div id="lgPlan"></div></div>
+          <div class="v-field" id="fResult"><div class="label-text">Tool result</div><div id="lgResult"></div></div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center">
+        <button class="button is-rounded is-small" id="lgPrev" aria-label="Previous step"><span class="icon"><i class="fas fa-chevron-left"></i></span></button>
+        <div class="step-dots" id="lgDots"></div>
+        <button class="button is-rounded is-small" id="lgNext" aria-label="Next step"><span class="icon"><i class="fas fa-chevron-right"></i></span></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SIMULATION ================= -->
+<section class="section" id="simulation">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Simulation Benchmark</h2>
+    <div class="content has-text-justified">
+      <p>600 simulated episodes with 395 household objects and two lighting conditions.</p>
+    </div>
+    <img class="figure-img" src="static/images/fig3_benchmark_scenes.jpg" alt="Example scenes from the simulation benchmark">
+    <p class="caption">Example benchmark scenes with different objects, table textures, and clutter levels. The green box marks the target.</p>
+    <div class="table-container mt-5">
+      <table class="table is-narrow is-hoverable is-fullwidth">
+        <thead>
+          <tr><th rowspan="2">Method</th><th colspan="2">Grounding SR (%) &uarr;</th><th colspan="2">Grasping SR (%) &uarr;</th><th colspan="2">Task SR (%) &uarr;</th><th colspan="2">Action Steps &darr;</th></tr>
+          <tr><th>Low</th><th>High</th><th>Low</th><th>High</th><th>Low</th><th>High</th><th>Low</th><th>High</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>GraspGen*</td><td>36.2</td><td>35.4</td><td>48.8</td><td><u>42.2</u></td><td>19.2</td><td>9.4</td><td>8.8</td><td>9.2</td></tr>
+          <tr><td>GraspMAS</td><td>62.8</td><td>55.0</td><td>29.2</td><td>25.8</td><td>27.2</td><td>16.7</td><td><b>1.3</b></td><td><b>1.1</b></td></tr>
+          <tr><td>UnoGrasp</td><td>52.7</td><td>46.1</td><td>32.5</td><td>18.8</td><td>34.2</td><td>23.8</td><td>8.7</td><td>9.2</td></tr>
+          <tr><td>ThinkGrasp</td><td>73.8</td><td>68.8</td><td>34.5</td><td>19.2</td><td>76.2</td><td>75.3</td><td>5.4</td><td>6.4</td></tr>
+          <tr><td>OWG</td><td><u>76.1</u></td><td><u>71.4</u></td><td><u>52.5</u></td><td>26.9</td><td><u>83.3</u></td><td><u>76.3</u></td><td><u>2.7</u></td><td><u>3.9</u></td></tr>
+          <tr><td>RoboDexVLM</td><td>70.2</td><td>65.6</td><td>38.0</td><td>28.5</td><td>60.4</td><td>49.2</td><td>6.5</td><td>8.6</td></tr>
+          <tr class="ours"><td><b>CLARO (ours)</b></td><td class="ev"><b>88.2</b></td><td class="ev"><b>86.3</b></td><td class="ev"><b>60.4</b></td><td class="ev"><b>45.3</b></td><td><b>89.5</b></td><td><b>88.6</b></td><td>3.0</td><td>4.9</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= STEP-BY-STEP REASONING IN SIMULATION ================= -->
+<section class="section" id="sim-steps">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Step-by-Step Reasoning in Simulation</h2>
+    <img class="figure-img" src="static/images/fig4_sim_comparison.jpg" alt="CLARO and OWG on the task: grasp the black shampoo bottle">
+    <p class="caption">"Grasp the black shampoo bottle" (green box). OWG removes the wrong objects and stops with the target still occluded. CLARO grasps one occluder, pushes the spoon aside, and grasps the target.</p>
+
+  </div>
+</section>
+
+<!-- ================= ABLATIONS ================= -->
+<section class="section section-shaded" id="ablations">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Ablations</h2>
+    <div class="table-container">
+      <table class="table is-narrow is-hoverable is-fullwidth">
+        <thead>
+          <tr><th rowspan="2">Variant</th><th colspan="2">Task SR (%) &uarr;</th><th colspan="2">Action Steps &darr;</th></tr>
+          <tr><th>Low</th><th>High</th><th>Low</th><th>High</th></tr>
+        </thead>
+        <tbody>
+          <tr class="ours"><td><b>CLARO (full)</b></td><td><b>89.5</b></td><td><b>88.6</b></td><td>3.0</td><td>4.9</td></tr>
+          <tr><td class="ev">w/o push tool</td><td>77.4</td><td>60.0</td><td>6.6</td><td>7.5</td></tr>
+          <tr><td class="ev">w/o long-term memory</td><td>71.2</td><td>52.9</td><td><b>1.9</b></td><td><b>3.8</b></td></tr>
+          <tr><td>w/o closed-loop replanning</td><td>74.9</td><td>56.6</td><td>3.1</td><td>4.1</td></tr>
+          <tr><td>w/o VLM-based planning</td><td>62.5</td><td>54.8</td><td>5.4</td><td>6.2</td></tr>
+          <tr><td>GraspNet as grasper</td><td>82.1</td><td>80.9</td><td>4.5</td><td>5.0</td></tr>
+          <tr><td>GPT 5.4 as planner</td><td>83.8</td><td>78.2</td><td>3.3</td><td>5.2</td></tr>
+          <tr><td>Qwen3.5-397B-A17B as planner</td><td>86.0</td><td>85.2</td><td>4.3</td><td>7.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">Task success rate (%). "w/o VLM-based planning" replaces the planner with a fixed survey &rarr; locate &rarr; grasp/push sequence.</p>
+    <h3 class="title is-4 mt-5 mb-3">Key findings</h3>
+    <div class="columns is-multiline">
+      <div class="column is-one-third-tablet">
+        <div class="finding"><p class="num">+35.7%</p><p class="head"><span class="key-term">Long-term memory</span> benefits with structured outcome state, not visual replay</p><p class="body">Without memory, high-clutter success falls by 35.7 points. Removing all past images but keeping the text record of tool results costs only 8.2 points. Keeping the images but removing the text costs 26.9 points.</p></div>
+      </div>
+      <div class="column is-one-third-tablet">
+        <div class="finding"><p class="num">+28.6%</p><p class="head"><span class="key-term">Non-prehensile push</span> improves robustness of open-vocabulary graspers</p><p class="body">Removing push lowers success by 12.1 points in low clutter and by 28.6 points in high clutter.</p></div>
+      </div>
+      <div class="column is-one-third-tablet">
+        <div class="finding"><p class="num">1.9% vs 15.1%</p><p class="head">Strong spatial grounding does not translate to <span class="key-term">reliable manipulation</span> in clutter</p><p class="body">From low to high clutter, grounding success falls by only 1.9 points, but grasp success falls by 15.1 points.</p></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= COMPARISON WITH PRIOR METHODS ================= -->
+<section class="section" id="comparison">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Comparison with Prior Methods</h2>
+    <div class="table-container">
+      <table class="table is-narrow is-hoverable is-fullwidth">
+        <thead><tr><th>Method</th><th>Grasp</th><th>Open-Vocab.</th><th>Closed-Loop Planning</th><th>Long-Term Memory</th><th>Non-Prehensile Manip.</th><th>Cross-Arm Deploy.</th></tr></thead>
+        <tbody>
+          <tr class="group"><td colspan="7">Referring grasp synthesis</td></tr>
+          <tr><td>CROG</td><td>4-DoF</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+          <tr><td>MapleGrasp</td><td>6-DoF</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+          <tr><td>UnoGrasp</td><td>6-DoF</td><td class="cross">&#10007;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+          <tr class="group"><td colspan="7">Language-agnostic grasp generation</td></tr>
+          <tr><td>GraspGen</td><td>6-DoF</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+          <tr class="group"><td colspan="7">Vision-language-action policies</td></tr>
+          <tr><td>&pi;<sub>0.5</sub></td><td>6-DoF</td><td class="cross">&#10007;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td></tr>
+          <tr><td>MolmoBot</td><td>6-DoF</td><td class="cross">&#10007;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td></tr>
+          <tr class="group"><td colspan="7">Training-free methods</td></tr>
+          <tr><td>OWG</td><td>4-DoF</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+          <tr><td>ThinkGrasp</td><td>6-DoF</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+          <tr><td>GraspMAS</td><td>4-DoF</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td><td class="check">&#10003;</td></tr>
+          <tr><td>RoboDexVLM</td><td>6-DoF</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">&#10007;</td><td class="cross">&#10007;</td></tr>
+          <tr class="ours"><td><b>CLARO (ours)</b></td><td>6-DoF</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= BIBTEX ================= -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+        <pre><code id="bibtex">@article{kim2026claro,
+      title={CLARO: Clutter Aware Robot Orchestrator for Open-Vocabulary Grasping using VLM Agents}, 
+      author={Sungsu Kim and Vineet Bhat and Prashanth Krishnamurthy and Ramesh Karri and Farshad Khorrami},
+      year={2026},
+      eprint={2610.24016},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2610.24016}, 
+}</code></pre>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content has-text-centered">
+          <p>
+            This website is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+            The template is borrowed from <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* Tool names: the logs use implementation names; the page shows the paper names. */
+var PAPER_NAMES = { perceive_scene: "survey_scene", perceive_find_object: "locate_object", grasp_and_remove: "grasp" };
+function paperNames(text) {
+  return String(text).replace(/\b(perceive_scene|perceive_find_object|grasp_and_remove)\b/g, function (m) { return PAPER_NAMES[m]; });
+}
+function escHTML(x) { return String(x).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+var N_OBJ_COLORS = 8;
+/* Color map from the object names of the latest survey: name (lower case) -> color index. */
+function colorMap(objects) {
+  var m = {}; (objects || []).forEach(function (n, i) { m[n.toLowerCase()] = i % N_OBJ_COLORS; }); return m;
+}
+/* Color index of an object name: exact match with a survey label, or the same words
+   in another order ("bottle of mayonnaise" = "mayonnaise bottle"). null if no match. */
+var STOP_WORDS = { of: 1, the: 1, a: 1, an: 1 };
+function nameWords(n) { return String(n).toLowerCase().split(/[^a-z0-9]+/).filter(function (w) { return w && !STOP_WORDS[w]; }); }
+function nameColor(name, cmap) {
+  if (!cmap) return null;
+  var k = cmap[name.toLowerCase()];
+  if (k !== undefined) return k;
+  var w = nameWords(name);
+  if (!w.length) return null;
+  for (var key in cmap) {
+    var kw = nameWords(key);
+    if (w.every(function (x) { return kw.indexOf(x) >= 0; }) && kw.every(function (x) { return w.indexOf(x) >= 0; })) return cmap[key];
+  }
+  return null;
+}
+/* Show object names as colored blocks (same colors as the survey list) and color success / failure words. */
+function colorize(text, args, status, cmap, target) {
+  if (!text) return "";
+  var h = escHTML(paperNames(text));
+  var names = Object.keys(cmap || {});
+  var arg = args && args[0] && !/^(left|right|up|down)$/.test(args[0]) ? args[0] : null;
+  if (arg) names.push(arg);
+  if (target) names.push(target);
+  var seen = {};
+  names = names.filter(function (n) { var l = n.toLowerCase(); if (seen[l] || !l.trim()) return false; seen[l] = 1; return true; })
+               .sort(function (a, b) { return b.length - a.length; });
+  if (names.length) {
+    var alt = names.map(function (n) { return escHTML(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("|");
+    var re = new RegExp("(^|[^A-Za-z0-9])(" + alt + ")(?![A-Za-z0-9])", "gi");
+    h = h.replace(re, function (all, pre, m) {
+      var k = nameColor(m.replace(/&amp;/g, "&"), cmap);
+      return pre + (k === null ? '<span class="obj-chip obj-target">' + m + "</span>" : '<span class="obj-chip obj-c' + k + '">' + m + "</span>");
+    });
+  }
+  if (status) {
+    h = h.replace(/\b(succeeded|Task complete|Found 1 instance\(s\))/g, '<span class="ok-word">$1</span>');
+    h = h.replace(/\b(FAILED|Object not found|Grasp budget exhausted|Perception loop)/g, '<span class="fail-word">$1</span>');
+  }
+  return h;
+}
+/* Tool result: survey steps list the objects as colored labels. */
+function resultHTML(p, cmap, target) {
+  if (p.tool === "perceive_scene" && p.objects && p.objects.length) {
+    var chips = p.objects.map(function (n, i) { return '<span class="obj-chip obj-c' + (i % N_OBJ_COLORS) + '">' + escHTML(n) + "</span>"; }).join(" ");
+    var summary = String(p.result || "").replace(/^Scene graph with \d+ objects\.\s*/, "");
+    return "Scene graph with " + p.objects.length + " objects:<div class=\"obj-chips\">" + chips + "</div>" + colorize(summary, [], false, cmap, target);
+  }
+  return colorize(p.result, p.args, true, cmap, target);
+}
+/* Latest survey objects at or before step index st. */
+function latestObjects(steps, st) {
+  for (var i = st; i >= 0; i--) if (steps[i].tool === "perceive_scene" && steps[i].objects) return steps[i].objects;
+  return null;
+}
+
+/* ===================================================================
+   Real-robot log viewer. Data: static/logs/episodes.js (LOG_SCENES).
+   Scenes and the trials shown come from SCENES above.
+   =================================================================== */
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  if (typeof LOG_SCENES === "undefined") { $("viewerRoot").innerHTML = '<p class="has-text-grey">Log data not found: static/logs/episodes.js</p>'; return; }
+  var byLog = {}; LOG_SCENES.forEach(function (x) { byLog[x.scene] = x; });
+  var sc = 0, st = 0;
+
+  function drawScenes() {
+    $("lgLow").innerHTML = ""; $("lgHigh").innerHTML = "";
+    SCENES.forEach(function (m, i) {
+      var b = document.createElement("button");
+      b.className = "button is-rounded" + (i === sc ? " is-link" : "");
+      b.textContent = (i + 1) + " · " + m.name;
+      b.onclick = function () { sc = i; st = 0; drawScenes(); render(); };
+      $(m.code.charAt(0) === "L" ? "lgLow" : "lgHigh").appendChild(b);
+    });
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function field(id, val) { $("f" + id).style.display = val ? "" : "none"; $("lg" + id).textContent = val || ""; }
+  function fieldHTML(id, html) { $("f" + id).style.display = html ? "" : "none"; $("lg" + id).innerHTML = html || ""; }
+  function trial() {
+    var m = SCENES[sc], ts = byLog[m.log].trials;
+    for (var k = 0; k < ts.length; k++) if (ts[k].trial === m.trial) return ts[k];
+    return ts[0];
+  }
+
+
+  function render() {
+    var t = trial(), p = t.steps[st], n = t.steps.length;
+    $("lgTask").innerHTML = '<b>Task:</b> <b>grasp the <span class="target-name">' + esc(t.target) + '</span></b>';
+    $("lgImg").innerHTML = p.image ? '<img alt="Planner input at step ' + (st + 1) + '" src="' + esc(p.image) + '">' : "";
+    $("lgExtra").innerHTML = p.extra ? '<img alt="Top-down push plan" src="' + esc(p.extra) + '" style="max-width:200px; border-radius:6px; border:1px solid #dbdbdb">' : "";
+    var args = (p.args || []).map(function (a) { return '<span class="arg">\'' + esc(a) + '\'</span>'; }).join(", ");
+    $("lgCall").className = "tool-call";
+    var cmap = colorMap(latestObjects(t.steps, st));
+    $("lgCall").innerHTML = '<span class="fn">' + esc(paperNames(p.tool)) + "</span>(" + args + ")";
+    fieldHTML("Reason", colorize(p.reasoning, p.args, false, cmap, t.target)); fieldHTML("Plan", colorize(p.plan, p.args, false, cmap, t.target)); fieldHTML("Result", resultHTML(p, cmap, t.target));
+    $("lgPrev").disabled = st === 0; $("lgNext").disabled = st === n - 1;
+    var dots = $("lgDots"); dots.innerHTML = "";
+    for (var i = 0; i < n; i++) {
+      var d = document.createElement("button");
+      d.className = "step-dot" + (i === st ? " on" : i < st ? " done" : "");
+      d.title = "Step " + (i + 1) + ": " + t.steps[i].tool;
+      (function (k) { d.onclick = function () { st = k; render(); }; })(i);
+      dots.appendChild(d);
+    }
+  }
+  $("lgPrev").onclick = function () { if (st > 0) { st--; render(); } };
+  $("lgNext").onclick = function () { if (st < trial().steps.length - 1) { st++; render(); } };
+  document.addEventListener("keydown", function (ev) {
+    var r = $("viewerRoot").getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) return;
+    if (ev.key === "ArrowLeft") $("lgPrev").click();
+    if (ev.key === "ArrowRight") $("lgNext").click();
+  });
+  for (var i = 0; i < SCENES.length; i++) if (SCENES[i].code === "H5") sc = i;
+  drawScenes(); render();
+})();
+
+/* ===================================================================
+   Real-robot episode selector. Each clip shows: initial scene and
+   instruction (top left), OWG (top right), ThinkGrasp (bottom left),
+   CLARO (bottom right).
+   =================================================================== */
+var REAL_EPISODES = [
+  { file: "real_pitted_cherries", log: "scene12", instr: "Grasp can of pitted cherries", ok: true },
+  { file: "real_green_beans", log: "scene18", instr: "Grasp can of green beans", ok: true },
+  { file: "real_tennis_ball", log: "scene09", instr: "Grasp the tennis ball", ok: true },
+  { file: "real_cola", log: "scene13", instr: "Grasp the can of cola", ok: true },
+  { file: "real_sliced_peaches", log: "scene08", instr: "Grasp the can of sliced peaches", ok: true },
+  { file: "real_blue_ointment", log: "scene15", instr: "Grasp the blue ointment", ok: true },
+  { file: "real_mayonnaise", log: "scene01", instr: "Grasp bottle of mayonnaise", ok: true },
+  { file: "real_butter", log: "scene17", instr: "Grasp box of butter", ok: true }
+];
+
+(function () {
+  function sceneOf(e) { for (var i = 0; i < SCENES.length; i++) if (SCENES[i].log === e.log) return SCENES[i]; return null; }
+  var order = REAL_EPISODES.map(function (e, i) { return i; }).sort(function (x, y) {
+    var a = sceneOf(REAL_EPISODES[x]).code, b = sceneOf(REAL_EPISODES[y]).code;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  var cur = 0;
+  function draw() {
+    ["epLow", "epHigh"].forEach(function (id) { document.getElementById(id).innerHTML = ""; });
+    order.forEach(function (i) {
+      var e = REAL_EPISODES[i], sc = sceneOf(e);
+      var b = document.createElement("button");
+      b.className = "button is-rounded" + (i === cur ? " is-link" : "");
+      b.textContent = sc.name;
+      b.onclick = function () { cur = i; draw(); load(); };
+      document.getElementById(sc.code.charAt(0) === "L" ? "epLow" : "epHigh").appendChild(b);
+    });
+  }
+  function load() {
+    var e = REAL_EPISODES[cur], sc = sceneOf(e);
+    var video = document.getElementById("epVideo");
+    if (video && video.tagName === "VIDEO") { video.src = "static/videos/" + e.file + ".mp4"; }
+    document.getElementById("epCaption").textContent =
+      '"' + e.instr + '." ' + sc.desc +
+      " Top left: initial scene and instruction. Top right: OWG. Bottom left: ThinkGrasp. Bottom right: CLARO.";
+  }
+  cur = order.filter(function (i) { return sceneOf(REAL_EPISODES[i]).code.charAt(0) === "L"; })[0];
+  draw();
+  load();
+})();
+
+/* ===================================================================
+   Tool panels in the Method section. Examples come from scene H5
+   (scene12, trial 4) in static/logs/episodes.js.
+   =================================================================== */
+(function () {
+  var TOOLS = [
+    { step: 0, name: "survey_scene", desc: "Returns the 2D points and labels of all visible objects, a top-down scene graph with directional relations (left-of, behind), and a scene description." },
+    { step: 1, name: "locate_object", desc: "Returns a bounding box and a SAM3 segmentation mask of the named object. The mask gives the object point cloud for grasping or pushing." },
+    { step: 2, name: "grasp", desc: "Computes a 6-DoF grasp with GraspGen. It retrieves the target or removes an occluder." },
+    { step: 5, name: "push", desc: "Moves the gripper in a linear sweep across an object, in a direction (left, right, up, or down in the image) and over a distance of 3 to 20 cm chosen by the planner. It moves objects that are hard to grasp." }
+  ];
+  var cards = document.querySelectorAll("#toolCards .tool-card");
+  var steps = null;
+  if (typeof LOG_SCENES !== "undefined") {
+    LOG_SCENES.forEach(function (sc) { if (sc.scene === "scene12") sc.trials.forEach(function (t) { if (t.trial === 4) steps = t.steps; }); });
+  }
+  function show(i) {
+    cards.forEach(function (c, k) { c.classList.toggle("is-active", k === i); });
+    var t = TOOLS[i], p = steps ? steps[t.step] : null;
+    document.getElementById("tdDesc").textContent = t.desc;
+    if (!p) return;
+    document.getElementById("tdImg").src = p.image;
+    var args = (p.args || []).map(function (a) { return "<span class=\"arg\">'" + a + "'</span>"; }).join(", ");
+    document.getElementById("tdCall").innerHTML = '<span class="fn">' + t.name + "</span>(" + args + ")";
+    document.getElementById("tdResult").innerHTML = resultHTML(p, colorMap(latestObjects(steps, t.step)));
+  }
+  cards.forEach(function (c, k) {
+    c.addEventListener("click", function () { show(k); });
+    c.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); show(k); } });
+  });
+  show(0);
+})();
+
+/* ===================================================================
+   Paper links and citation. Set CODE_URL when the code is public.
+   Until then, the Code button stays on this page.
+   =================================================================== */
+var ARXIV_ID = "2610.24016";
+var CODE_URL = "";
+(function () {
+  function set(id, url) {
+    var a = document.getElementById(id);
+    if (url) { a.href = url; a.target = "_blank"; a.rel = "noopener"; }
+    else { a.href = "#"; a.title = "Code coming soon"; a.onclick = function (e) { e.preventDefault(); }; }
+  }
+  set("lnkPaper", ARXIV_ID ? "https://arxiv.org/pdf/" + ARXIV_ID : "");
+  set("lnkArxiv", ARXIV_ID ? "https://arxiv.org/abs/" + ARXIV_ID : "");
+  set("lnkCode", CODE_URL);
+})();
+</script>
+</body>
+</html>

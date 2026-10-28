@@ -109,3 +109,7 @@ body { font-family: 'Noto Sans', sans-serif; }
 /* Footer (license line) */
 .footer { background-color: #222; }
 .footer .content { color: #d0d0d0; }
+
+/* Key findings: the explanation appears when the mouse is over the card (tap on phones) */
+.finding .body { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease; }
+.finding:hover .body { max-height: 12em; opacity: 1; margin-top: 0.5rem; }

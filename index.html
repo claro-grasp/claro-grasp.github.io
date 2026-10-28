@@ -7,9 +7,15 @@
   <meta name="keywords" content="CLARO, VLM agent, open-vocabulary grasping, clutter, robot manipulation, WACV">
   <meta property="og:title" content="CLARO: Clutter Aware Robot Orchestrator for Open-Vocabulary Grasping using VLM Agents">
   <meta property="og:description" content="Training-free VLM agent for open-vocabulary grasping in clutter. WACV 2027.">
-  <meta property="og:image" content="static/images/fig2_pipeline.jpg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://claro-grasp.github.io/">
+  <meta property="og:image" content="https://claro-grasp.github.io/static/images/fig2_pipeline.jpg">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="author" content="Sungsu Kim, Vineet Bhat, Prashanth Krishnamurthy, Ramesh Karri, Farshad Khorrami">
   <title>CLARO: Clutter Aware Robot Orchestrator</title>
+  <link rel="icon" type="image/svg+xml" href="./static/images/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="./static/images/favicon-32.png">
+  <link rel="apple-touch-icon" href="./static/images/apple-touch-icon.png">
 
   <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
 
@@ -60,7 +66,7 @@ var SCENES = [
 
                     <div class="is-size-5 publication-authors">
             <span class="author-block"><a href="https://sungsuk1m.github.io/" target="_blank" rel="noopener">Sungsu Kim</a><sup>1,*</sup>,</span>
-            <span class="author-block"><a href="https://scholar.google.com/citations?user=rt6UWvgAAAAJ&amp;hl=en" target="_blank" rel="noopener">Vineet Bhat</a><sup>2,*</sup>,</span>
+            <span class="author-block"><a href="https://vineet2104.github.io/" target="_blank" rel="noopener">Vineet Bhat</a><sup>2,*</sup>,</span>
             <span class="author-block"><a href="https://scholar.google.com/citations?user=IKzz9l0AAAAJ&amp;hl=en" target="_blank" rel="noopener">Prashanth Krishnamurthy</a><sup>2</sup>,</span>
             <span class="author-block"><a href="https://scholar.google.com/citations?user=o60TaTEAAAAJ&amp;hl=en" target="_blank" rel="noopener">Ramesh Karri</a><sup>2</sup>,</span>
             <span class="author-block"><a href="https://scholar.google.com/citations?user=NdOqlPQAAAAJ&amp;hl=en" target="_blank" rel="noopener">Farshad Khorrami</a><sup>2</sup></span>
@@ -106,9 +112,9 @@ var SCENES = [
     <div class="hero-body">
       <div class="tldr mb-5">
         <span class="tldr-label">TL;DR</span>
-        <p><b>CLARO</b> is a training-free VLM agent that finds and grasps an object named in natural language, even when it is hidden in clutter.
-          It calls perception, grasp, and push tools in a closed loop and keeps a memory of its past actions.
-          It reaches <b>88.8%</b> success on a real Franka arm and <b>89.1%</b> in simulation.</p>
+        <p><b>CLARO</b> is a training-free VLM agent for open-vocabulary grasping: it finds and grasps target objects even when hidden in clutter.
+          The agent orchestrates perception, grasping, and <b>pushing</b> tools to clear obstructions, using <b>memory</b> and feedback to adapt its plan as the scene changes.
+          Experiments show average task success rates of <b>88.8%</b> on a real Franka arm and <b>89.1%</b> in simulation.</p>
       </div>
       <video id="teaser" autoplay muted loop playsinline controls preload="metadata" style="width:100%" src="static/videos/teaser.mp4"></video>
     </div>
@@ -335,13 +341,13 @@ var SCENES = [
     <h3 class="title is-4 mt-5 mb-3">Key findings</h3>
     <div class="columns is-multiline">
       <div class="column is-one-third-tablet">
-        <div class="finding"><p class="num">+35.7%</p><p class="head"><span class="key-term">Long-term memory</span> benefits with structured outcome state, not visual replay</p><p class="body">Without memory, high-clutter success falls by 35.7 points. Removing all past images but keeping the text record of tool results costs only 8.2 points. Keeping the images but removing the text costs 26.9 points.</p></div>
+        <div class="finding"><p class="num">+35.7%</p><p class="head"><span class="key-term">Long-term memory</span> works best as a record of actions and outcomes, not past images.</p><p class="body">Without memory, high-clutter success falls by 35.7 points. Removing all past images but keeping the text record of tool results costs only 8.2 points. Keeping the images but removing the text costs 26.9 points.</p></div>
       </div>
       <div class="column is-one-third-tablet">
-        <div class="finding"><p class="num">+28.6%</p><p class="head"><span class="key-term">Non-prehensile push</span> improves robustness of open-vocabulary graspers</p><p class="body">Removing push lowers success by 12.1 points in low clutter and by 28.6 points in high clutter.</p></div>
+        <div class="finding"><p class="num">+28.6%</p><p class="head">Adding a <span class="key-term">non-prehensile push</span> tool makes grasping in clutter more reliable.</p><p class="body">Removing push lowers success by 12.1 points in low clutter and by 28.6 points in high clutter.</p></div>
       </div>
       <div class="column is-one-third-tablet">
-        <div class="finding"><p class="num">1.9% vs 15.1%</p><p class="head">Strong spatial grounding does not translate to <span class="key-term">reliable manipulation</span> in clutter</p><p class="body">From low to high clutter, grounding success falls by only 1.9 points, but grasp success falls by 15.1 points.</p></div>
+        <div class="finding"><p class="num">1.9% vs 15.1%</p><p class="head">Knowing where an object is does not guarantee a <span class="key-term">successful grasp</span> in clutter.</p><p class="body">From low to high clutter, grounding success falls by only 1.9 points, but grasp success falls by 15.1 points. On the real robot, 80% of failure events came from manipulation (grasping and pushing).</p></div>
       </div>
     </div>
 
